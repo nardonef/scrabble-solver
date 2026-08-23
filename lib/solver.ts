@@ -146,8 +146,13 @@ function tryPlacementsFrom(
 
     finish(frame);
 
+    let triedBlank = false;
     for (let i = 0; i < frame.remainingRack.length; i++) {
       const tile = frame.remainingRack[i];
+      if (tile.kind === "blank") {
+        if (triedBlank) continue; // the two blanks are interchangeable
+        triedBlank = true;
+      }
       const candidates = tile.kind === "blank" ? ALPHABET : [tile.letter];
       for (const letter of candidates) {
         const nextPrefix = frame.prefix + letter;
@@ -164,7 +169,6 @@ function tryPlacementsFrom(
           remainingRack: restRack,
         });
       }
-      if (tile.kind === "blank") break; // the two blanks are interchangeable
     }
   }
 

@@ -94,4 +94,24 @@ describe("findBestPlays", () => {
     // CAT, CAB, CAP, CAR, CAN, CAW are all valid completions of "CA?"
     expect(plays.length).toBeGreaterThan(0);
   });
+
+  it("still tries letter tiles that come after a blank in the rack array", () => {
+    const board = emptyBoard();
+    // The blank is listed first, followed by the literal letters C, A, T.
+    // Forming "CATS" requires the literal C tile at the *first* position of
+    // the word (with the blank reserved for the final S) — a buggy
+    // implementation that breaks out of the rack loop entirely after the
+    // first blank (rather than just skipping a redundant second blank) can
+    // only ever fill the first position with the blank itself, since the
+    // blank sits before C/A/T in the array. That consumes the blank on the
+    // first letter, leaving no blank free for S, so "CATS" becomes
+    // unreachable under the bug even though every tile needed is present.
+    // maxResults is raised because several other anagrams of C/A/T/blank score
+    // higher depending on which premium squares a given start offset lands
+    // on; we only care whether "CATS" is reachable at all, not whether it's
+    // top-ranked.
+    const rack: RackTile[] = [{ kind: "blank" }, letterTile("C"), letterTile("A"), letterTile("T")];
+    const plays = findBestPlays(board, rack, 50);
+    expect(plays.some((p) => p.word === "CATS")).toBe(true);
+  });
 });
