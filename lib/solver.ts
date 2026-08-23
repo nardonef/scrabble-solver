@@ -208,6 +208,12 @@ export function findBestPlays(board: Board, rack: RackTile[], maxResults = 5): P
             br -= dr;
             bc -= dc;
           }
+          // If the walk stopped because it hit an existing tile (rather than
+          // running off the board), the farthest empty cell is adjacent to
+          // that tile. Starting the word there would leave that tile
+          // un-absorbed even though it's mandatory, silently truncating the
+          // real word — so exclude that one overshoot position.
+          if (inBounds(br, bc)) maxBack--;
         }
 
         for (let back = 0; back <= maxBack; back++) {
@@ -217,6 +223,13 @@ export function findBestPlays(board: Board, rack: RackTile[], maxResults = 5): P
     }
   }
 
+  // Sort before dedup: two placements (e.g. a real tile vs. a blank standing
+  // in for the same letter) can share the same word/row/col/direction key
+  // but score differently (blanks score 0). Sorting first ensures dedup
+  // keeps the highest-scoring variant for each key, not whichever happened
+  // to be enumerated first.
+  plays.sort((a, b) => b.score - a.score);
+
   const seen = new Set<string>();
   const unique = plays.filter((p) => {
     const key = `${p.word}|${p.row}|${p.col}|${p.direction}`;
@@ -225,6 +238,5 @@ export function findBestPlays(board: Board, rack: RackTile[], maxResults = 5): P
     return true;
   });
 
-  unique.sort((a, b) => b.score - a.score);
   return unique.slice(0, maxResults);
 }
