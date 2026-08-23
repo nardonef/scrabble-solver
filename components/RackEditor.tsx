@@ -22,7 +22,7 @@ export function RackEditor({ rack, onChange }: Props) {
   }
 
   function addTile() {
-    onChange([...rack, { kind: "letter", letter: "" }]);
+    onChange([...rack, { kind: "blank" }]);
   }
 
   return (
@@ -43,7 +43,15 @@ export function RackEditor({ rack, onChange }: Props) {
             <input
               type="checkbox"
               checked={tile.kind === "blank"}
-              onChange={(e) => setTile(i, e.target.checked ? { kind: "blank" } : { kind: "letter", letter: "" })}
+              onChange={(e) => {
+                // Checking marks the slot as a blank tile. Unchecking a slot
+                // that has no letter typed has nothing to revert to — a rack
+                // slot must never become {kind: "letter", letter: ""}, so it
+                // stays blank.
+                if (e.target.checked) {
+                  setTile(i, { kind: "blank" });
+                }
+              }}
             />
             blank
           </label>

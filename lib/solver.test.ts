@@ -167,4 +167,23 @@ describe("findBestPlays", () => {
     // 0-scoring blank variant had been kept instead.
     expect(cats[0].score).toBe(6);
   });
+
+  it("skips a malformed {kind: 'letter', letter: ''} rack tile instead of producing garbage plays", () => {
+    const board = emptyBoard();
+    const validRack = ["C", "A", "T"].map(letterTile);
+    const malformedRack: RackTile[] = [...validRack, { kind: "letter", letter: "" }];
+
+    const validPlays = findBestPlays(board, validRack, 50);
+    const malformedPlays = findBestPlays(board, malformedRack, 50);
+
+    for (const p of malformedPlays) {
+      expect(Number.isFinite(p.score)).toBe(true);
+      expect(/^[A-Z]+$/.test(p.word)).toBe(true);
+    }
+
+    // The malformed tile should be a pure no-op: identical plays with or
+    // without it in the rack.
+    const key = (p: (typeof malformedPlays)[number]) => `${p.word}|${p.row}|${p.col}|${p.direction}`;
+    expect(malformedPlays.map(key).sort()).toEqual(validPlays.map(key).sort());
+  });
 });

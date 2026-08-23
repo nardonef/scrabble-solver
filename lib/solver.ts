@@ -149,6 +149,11 @@ function tryPlacementsFrom(
     let triedBlank = false;
     for (let i = 0; i < frame.remainingRack.length; i++) {
       const tile = frame.remainingRack[i];
+      // Defensive guard: a rack tile should never be {kind: "letter"} with
+      // anything but a single A-Z letter, but skip it here rather than trust
+      // every caller — a malformed tile would otherwise act as a zero-width
+      // "letter" (desyncing word length from board position) and score NaN.
+      if (tile.kind === "letter" && !/^[A-Z]$/.test(tile.letter)) continue;
       if (tile.kind === "blank") {
         if (triedBlank) continue; // the two blanks are interchangeable
         triedBlank = true;

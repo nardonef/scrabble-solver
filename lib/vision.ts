@@ -2,16 +2,40 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { ScanResult } from "./types";
 
+export type SupportedImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+const SCAN_FAILURE_MESSAGE =
+  "Couldn't read the board from that photo — try again with better lighting or a clearer angle.";
+
+// A grid cell is only ever a single A-Z letter or empty. Anything else a model
+// might plausibly return for an empty square ("", ".", multi-character strings,
+// punctuation) is normalized to null rather than passed through as a "letter" —
+// otherwise isBoardEmpty/isAnchor silently break and every cell desyncs word
+// length from board position.
+const gridCellSchema = z.union([z.string(), z.null()]).transform((cell) => {
+  if (cell === null) return null;
+  return /^[A-Za-z]$/.test(cell) ? cell.toUpperCase() : null;
+});
+
+// A rack entry is only ever a single A-Z letter or the literal "BLANK". Any
+// other string is normalized to null and dropped in toScanResult rather than
+// reaching the solver as a malformed tile.
+const rackEntrySchema = z.string().transform((entry) => {
+  const upper = entry.toUpperCase();
+  if (upper === "BLANK") return "BLANK" as const;
+  return /^[A-Z]$/.test(upper) ? upper : null;
+});
+
 const scanSchema = z.object({
-  grid: z.array(z.array(z.union([z.string(), z.null()])).length(15)).length(15),
-  rack: z.array(z.string()).min(0).max(7),
+  grid: z.array(z.array(gridCellSchema).length(15)).length(15),
+  rack: z.array(rackEntrySchema).min(0).max(7),
 });
 
 const TOOL_NAME = "report_board_state";
 
 export async function scanBoardImage(
   imageBase64: string,
-  mediaType: string,
+  mediaType: SupportedImageMediaType,
   client: Anthropic
 ): Promise<ScanResult> {
   const response = await client.messages.create({
@@ -41,7 +65,7 @@ export async function scanBoardImage(
         content: [
           {
             type: "image",
-            source: { type: "base64", media_type: mediaType as "image/jpeg", data: imageBase64 },
+            source: { type: "base64", media_type: mediaType, data: imageBase64 },
           },
           {
             type: "text",
@@ -63,18 +87,21 @@ export async function scanBoardImage(
     throw new Error("Vision response did not include board data");
   }
 
-  const parsed = scanSchema.parse(toolUse.input);
+  let parsed: z.infer<typeof scanSchema>;
+  try {
+    parsed = scanSchema.parse(toolUse.input);
+  } catch {
+    throw new Error(SCAN_FAILURE_MESSAGE);
+  }
   return toScanResult(parsed);
 }
 
 function toScanResult(parsed: z.infer<typeof scanSchema>): ScanResult {
   const board = parsed.grid.map((row) =>
-    row.map((cell) => (cell === null ? null : { letter: cell.toUpperCase(), isBlank: false }))
+    row.map((cell) => (cell === null ? null : { letter: cell, isBlank: false }))
   );
-  const rack = parsed.rack.map((r) =>
-    r.toUpperCase() === "BLANK"
-      ? ({ kind: "blank" } as const)
-      : ({ kind: "letter", letter: r.toUpperCase() } as const)
-  );
+  const rack = parsed.rack
+    .filter((r): r is "BLANK" | string => r !== null)
+    .map((r) => (r === "BLANK" ? ({ kind: "blank" } as const) : ({ kind: "letter", letter: r } as const)));
   return { board, rack };
 }

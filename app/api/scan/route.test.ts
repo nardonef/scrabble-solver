@@ -46,4 +46,27 @@ describe("POST /api/scan", () => {
     expect(res.status).toBe(502);
     expect(body.error).toBe("bad image");
   });
+
+  it("returns 400 with an error shape (not a thrown exception) for a malformed JSON body", async () => {
+    const request = new Request("http://localhost/api/scan", {
+      method: "POST",
+      body: "{not valid json",
+      headers: { "content-type": "application/json" },
+    });
+
+    const res = await POST(request as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(typeof body.error).toBe("string");
+  });
+
+  it("returns 400 for an unsupported image media type", async () => {
+    const res = await POST(jsonRequest({ imageBase64: "abc", mediaType: "image/heic" }) as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Unsupported image type — please use JPEG, PNG, GIF, or WebP");
+    expect(scanBoardImage).not.toHaveBeenCalled();
+  });
 });

@@ -18,11 +18,28 @@ describe("RackEditor", () => {
     expect(onChange).toHaveBeenCalledWith([{ kind: "letter", letter: "Z" }]);
   });
 
-  it("adds a tile up to a max of 7", () => {
+  it("adds a blank tile (never an empty-string letter tile) when add-tile is clicked", () => {
+    const onChange = vi.fn();
+    const rack: RackTile[] = [{ kind: "letter", letter: "A" }];
+    render(<RackEditor rack={rack} onChange={onChange} />);
+    fireEvent.click(screen.getByTestId("add-tile"));
+    expect(onChange).toHaveBeenCalledWith([{ kind: "letter", letter: "A" }, { kind: "blank" }]);
+  });
+
+  it("hides the add-tile button at a max of 7 tiles", () => {
     const onChange = vi.fn();
     const rack: RackTile[] = Array(7).fill({ kind: "letter", letter: "A" });
     render(<RackEditor rack={rack} onChange={onChange} />);
     expect(screen.queryByTestId("add-tile")).not.toBeInTheDocument();
+  });
+
+  it("does not turn an unchecked blank tile into an empty-string letter tile", () => {
+    const onChange = vi.fn();
+    const rack: RackTile[] = [{ kind: "blank" }];
+    render(<RackEditor rack={rack} onChange={onChange} />);
+    const checkbox = screen.getByRole("checkbox");
+    fireEvent.click(checkbox); // uncheck the blank checkbox
+    expect(onChange).not.toHaveBeenCalledWith([{ kind: "letter", letter: "" }]);
   });
 
   it("removes a tile", () => {

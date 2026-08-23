@@ -51,14 +51,23 @@ export default function Home() {
   async function handleSolve() {
     if (!board) return;
     setStage("solving");
-    const res = await fetch("/api/solve", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ board, rack }),
-    });
-    const body = await res.json();
-    setPlays(body.plays);
-    setStage("results");
+    try {
+      const res = await fetch("/api/solve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ board, rack }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error ?? "Failed to solve board");
+      }
+      const body = await res.json();
+      setPlays(body.plays);
+      setStage("results");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to solve board");
+      setStage("error");
+    }
   }
 
   function reset() {
@@ -102,7 +111,7 @@ export default function Home() {
       {stage === "results" && board && (
         <div>
           <BoardGrid
-            board={board}
+            board={plays[0] ? boardWithPlay(board, plays[0]) : board}
             highlighted={plays[0] ? highlightedCells(plays[0]) : []}
           />
           {plays.length === 0 ? (
@@ -111,7 +120,8 @@ export default function Home() {
             <ul>
               {plays.map((p, i) => (
                 <li key={i}>
-                  <strong>{p.word}</strong> — score: {p.score}
+                  <strong>{p.word}</strong> — row {p.row + 1}, col {p.col + 1}, {p.direction} — score:{" "}
+                  {p.score}
                 </li>
               ))}
             </ul>
@@ -136,4 +146,12 @@ function highlightedCells(play: Play): { row: number; col: number }[] {
       ? { row: play.row, col: play.col + i }
       : { row: play.row + i, col: play.col }
   );
+}
+
+function boardWithPlay(board: Board, play: Play): Board {
+  const next = board.map((row) => [...row]);
+  highlightedCells(play).forEach(({ row, col }, i) => {
+    next[row][col] = { letter: play.word[i], isBlank: false };
+  });
+  return next;
 }

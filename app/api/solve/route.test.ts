@@ -28,4 +28,18 @@ describe("POST /api/solve", () => {
     expect(Array.isArray(json.plays)).toBe(true);
     expect(json.plays.length).toBeGreaterThan(0);
   });
+
+  it("returns 400 with an error shape (not a thrown exception) for a malformed JSON body", async () => {
+    const request = new Request("http://localhost/api/solve", {
+      method: "POST",
+      body: "{not valid json",
+      headers: { "content-type": "application/json" },
+    });
+
+    const res = await POST(request as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(typeof body.error).toBe("string");
+  });
 });

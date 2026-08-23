@@ -34,8 +34,22 @@ describe("scanBoardImage", () => {
     );
   });
 
-  it("throws when the tool input fails schema validation", async () => {
+  it("throws a human-readable error (not the raw Zod error) when the tool input fails schema validation", async () => {
     const client = fakeClient({ grid: "not-a-grid", rack: [] });
-    await expect(scanBoardImage("base64data", "image/jpeg", client)).rejects.toThrow();
+    await expect(scanBoardImage("base64data", "image/jpeg", client)).rejects.toThrow(
+      "Couldn't read the board from that photo — try again with better lighting or a clearer angle."
+    );
+  });
+
+  it("normalizes an empty-string grid cell to null instead of an empty letter", async () => {
+    const grid = Array.from({ length: 15 }, () => Array(15).fill(null));
+    grid[3][3] = "";
+    grid[4][4] = "Qu"; // a multi-character cell is similarly not a real letter
+    const client = fakeClient({ grid, rack: [] });
+
+    const result = await scanBoardImage("base64data", "image/jpeg", client);
+
+    expect(result.board[3][3]).toBeNull();
+    expect(result.board[4][4]).toBeNull();
   });
 });
