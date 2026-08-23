@@ -623,8 +623,16 @@ describe("findBestPlays", () => {
     const plays = findBestPlays(board, rack);
     expect(plays.length).toBeGreaterThan(0);
     const best = plays[0];
-    expect(best.row === 7 || best.col === 7).toBe(true); // passes through center
-    expect(["CAT", "CATS", "ACT", "TACS"].includes(best.word)).toBe(true);
+    // Several valid anagrams of C/A/T/S exist (CAT, ACT, CATS, CAST, SCAT) and
+    // which one scores highest depends on board position, so assert the
+    // general shape rather than one exact word: it must use only rack
+    // letters, be at least 2 long, and cover the center square.
+    const cells = Array.from({ length: best.word.length }, (_, i) =>
+      best.direction === "across" ? [best.row, best.col + i] : [best.row + i, best.col]
+    );
+    expect(cells.some(([r, c]) => r === 7 && c === 7)).toBe(true);
+    expect([...best.word].every((ch) => "CATS".includes(ch))).toBe(true);
+    expect(best.word.length).toBeGreaterThanOrEqual(2);
   });
 
   it("rejects placements that don't touch the center on an empty board", () => {
@@ -656,22 +664,25 @@ describe("findBestPlays", () => {
     board[7][7] = { letter: "C", isBlank: false };
     board[7][8] = { letter: "A", isBlank: false };
     board[7][9] = { letter: "T", isBlank: false };
-    // "XX" is not a valid word, so a down play placing X at (8,9) forming "TX" must be rejected
-    const rack = ["X", "X"].map(letterTile);
+    const rack = ["X"].map(letterTile);
     const plays = findBestPlays(board, rack);
-    expect(plays.every((p) => p.word !== "TX" && p.word !== "XX")).toBe(true);
+    // X placed under A forms the valid word "AX"; X placed under C or T would
+    // form "CX"/"TX", which aren't words and must be rejected rather than returned.
+    expect(plays.some((p) => p.word === "AX")).toBe(true);
+    expect(plays.every((p) => p.word !== "CX" && p.word !== "TX")).toBe(true);
   });
 
   it("awards the 50-point bingo bonus when all 7 rack tiles are used", () => {
     const board = emptyBoard();
-    // Rack that can form a real 7-letter word: "LANTER" + "N" -> not guaranteed to be a word;
-    // instead assert indirectly: any returned play using 7 tiles scores >= sum of its letters + 50.
-    const rack = ["S", "T", "A", "R", "L", "I", "N", "G"].slice(0, 7).map(letterTile);
+    // O,R,I,E,N,T,S: all letter values are 1, and "ORIENTS" is a valid 7-letter
+    // word, so a bingo play covering the center is guaranteed to be found.
+    // Score has a guaranteed floor of (sum of letter values) + 50, since
+    // multipliers can only add to that, never subtract.
+    const rack = ["O", "R", "I", "E", "N", "T", "S"].map(letterTile);
     const plays = findBestPlays(board, rack, 20);
     const bingo = plays.find((p) => p.word.length === 7);
-    if (bingo) {
-      expect(bingo.score).toBeGreaterThanOrEqual(50);
-    }
+    expect(bingo).toBeDefined();
+    expect(bingo!.score).toBeGreaterThanOrEqual(7 + 50);
   });
 
   it("returns an empty array when no legal play exists", () => {
